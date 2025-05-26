@@ -25,7 +25,7 @@
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/bocaletto-luca/Mahjong.git
+   git clone https://github.com/bocaletto-luca/Mahjong-Solitaire.git
 2. Start Sever Web Example Apache2 and open index.html in web Browser
 
 ## Usage
