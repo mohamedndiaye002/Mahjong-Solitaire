@@ -11,7 +11,7 @@
       margin: 0;
       padding: 0;
     }
-    /* Use flex on the body so that the footer stays at the bottom */
+    /* Use flex on the body so the footer stays pinned to the bottom */
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background-color: #121212;
@@ -20,10 +20,11 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      overflow-x: hidden;
+      overflow-x: hidden; /* hide horizontal scrollbar */
+      text-align: center;
     }
-    h1 { 
-      margin-bottom: 10px; 
+    h1 {
+      margin-bottom: 10px;
     }
     button {
       padding: 8px 16px;
@@ -41,7 +42,7 @@
     }
     
     /* ====================== BOARD CONTAINER ====================== */
-    /* Our board container will serve as the game area on which tiles are placed. */
+    /* The board-container holds all the tiles arranged by layers */
     #board-container {
       position: relative;
       margin: 0 auto;
@@ -68,21 +69,23 @@
       transition: opacity 0.3s ease;
       cursor: pointer;
     }
-    /* In Mahjong Solitaire, all tiles typically show their face.
-       Here, we use .back style only if needed (e.g. if we want to hide them),
-       but in our implementation all tiles are shown. */
+    /* Although Mahjong tiles are always faceup in solitaire,
+       we include a .back style if needed */
     .tile.back {
       background-color: #444;
       border: 1px solid #222;
       color: #444;
     }
-    /* Highlight a selected tile */
+    /* A selected tile is highlighted */
     .tile.selected {
       outline: 3px solid #FFD700;
     }
+    /* During drag, lower opacity */
+    .dragging { opacity: 0.6; }
+    /* Highlight dropable area */
+    .drag-over { border: 2px dashed #FFD700; }
     
     /* ====================== MESSAGE AREA ====================== */
-    /* Display feedback messages below the board. */
     #message {
       margin-top: 20px;
       padding: 8px;
@@ -136,10 +139,17 @@
       text-align: center;
     }
     
-    /* ====================== RESPONSIVE ====================== */
+    /* ====================== RESPONSIVE STYLES ====================== */
     @media (max-width: 600px) {
-      .tile { width: 60px; height: 75px; font-size: 1.1rem; }
-      #board-container { max-width: 100%; height: 400px; }
+      .tile {
+        width: 60px;
+        height: 75px;
+        font-size: 1.1rem;
+      }
+      #board-container {
+        max-width: 100%;
+        height: 400px;
+      }
     }
   </style>
 </head>
@@ -151,10 +161,10 @@
     <button id="newGameBtn">New Game</button>
   </header>
   
-  <!-- BOARD CONTAINER: The board where all tiles are arranged -->
+  <!-- BOARD CONTAINER -->
   <div id="board-container"></div>
   
-  <!-- MESSAGE AREA for feedback on moves -->
+  <!-- MESSAGE AREA -->
   <div id="message"></div>
   
   <!-- FOOTER -->
@@ -171,9 +181,9 @@
         <strong>Goal:</strong> Remove all matching pairs of tiles from the board.<br><br>
         <strong>Rules:</strong><br>
         - Tiles can be removed in pairs if they match exactly.<br>
-        - A tile is considered <em>free</em> if it is not covered by any tile from a higher layer and if at least one of its left or right sides is unobstructed.<br>
+        - A tile is considered <em>free</em> if it is not covered by any tile on a higher layer and if at least one of its left or right sides is unobstructed.<br>
         - Click a free tile to select it. Then click on a second free tile with the same symbol to remove both tiles.<br>
-        - If the two selected tiles do not match, they will be deselected.<br><br>
+        - If the two selected tiles do not match, they are deselected.<br><br>
         Enjoy the game!
       </p>
     </div>
@@ -181,61 +191,63 @@
   
   <!-- ====================== JAVASCRIPT ====================== -->
   <script>
-    /*********************************************
+    /***********************************************
      * Global Variables and Game State
-     *********************************************/
-    let tiles = [];            // Array of all tile objects
+     ***********************************************/
+    let tiles = [];            // Array of tile objects
     let selectedTileId = null; // Currently selected tile id (if any)
     
-    // Dimensions for each tile. These are used in positions.
+    // Dimensions for each tile
     const TILE_WIDTH = 80;
     const TILE_HEIGHT = 100;
     
-    /*********************************************
-     * Board Layout: Define positions for all tiles.
-     * We'll define a two-layer layout:
-     * - Layer 0: 28 tiles arranged in a 7x4 grid.
-     * - Layer 1: 8 tiles arranged in 2 rows of 4 tiles, centered.
-     *********************************************/
+    /***********************************************
+     * Board Layout Positions
+     * We define a two-layer layout:
+     * - Layer 0: 28 positions arranged in a 7x4 grid.
+     * - Layer 1: 8 positions arranged in 2 rows of 4, centered.
+     * Total positions = 36.
+     ***********************************************/
     let positions = [];
-    // Layer 0: 7 columns, 4 rows. (Total 28 tiles)
+    // Layer 0 positions: 7 columns x 4 rows = 28 tiles.
     for (let row = 0; row < 4; row++) {
       for (let col = 0; col < 7; col++) {
         positions.push({
           x: 50 + col * 100, // horizontal spacing
           y: 50 + row * 110, // vertical spacing
-          z: 0,              // layer 0
+          z: 0,              // base layer
           width: TILE_WIDTH,
           height: TILE_HEIGHT
         });
       }
     }
-    // Layer 1: 2 rows, 4 columns (Total 8 tiles), centered.
+    // Layer 1 positions: 2 rows x 4 columns = 8 tiles, centered.
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < 4; col++) {
         positions.push({
           x: 200 + col * 100, // centered horizontally
           y: 150 + row * 110, // vertical placement
-          z: 1,              // layer 1 (on top of layer 0)
+          z: 1,              // upper layer
           width: TILE_WIDTH,
           height: TILE_HEIGHT
         });
       }
     }
-    // Total positions: 28 + 8 = 36
     
-    /*********************************************
-     * Initialize Game
-     * - Create tile pairs (each type appears twice for 36 tiles)
-     *********************************************/
+    /***********************************************
+     * Initialize the Game
+     * - Use 18 unique Mahjong tile emojis, each appears twice.
+     * - Total tiles = 36.
+     ***********************************************/
     function initGame() {
       tiles = [];
       selectedTileId = null;
       document.getElementById("message").textContent = "";
       
-      // Define 18 unique tile types (using letters A-R)
-      let types = "ABCDEFGHIJKLMNOPQR".split("");
-      // Create an array with each type appearing twice (total should be 36 tiles)
+      // 18 unique Mahjong tile emojis.
+      let types = ["🀇", "🀈", "🀉", "🀊", "🀋", "🀌", "🀍", "🀎", "🀏",
+                   "🀐", "🀑", "🀒", "🀓", "🀔", "🀕", "🀖", "🀗", "🀘"];
+      // Create a list where each type appears twice.
       let tileTypes = [];
       types.forEach(type => {
         tileTypes.push(type);
@@ -243,7 +255,7 @@
       });
       shuffle(tileTypes);
       
-      // Assign a type to each position
+      // Assign each tile a type and a position.
       for (let i = 0; i < positions.length; i++) {
         let pos = positions[i];
         let tile = {
@@ -261,7 +273,7 @@
       renderTiles();
     }
     
-    // Fisher-Yates Shuffle
+    // Fisher–Yates Shuffle
     function shuffle(array) {
       for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -269,48 +281,45 @@
       }
     }
     
-    /*********************************************
+    /***********************************************
      * Rendering Functions
-     * Renders all tiles based on their properties and current game state.
-     *********************************************/
+     ***********************************************/
     function renderTiles() {
       let board = document.getElementById("board-container");
-      board.innerHTML = "";  // Clear previous rendering
-      
-      // Sort tiles by z-index (layer) so that tiles on higher layers appear on top
+      board.innerHTML = "";
+      // Sort tiles by layer (z-index) so that tiles in higher layers show on top.
       let sortedTiles = tiles.slice().sort((a, b) => a.z - b.z);
       
       sortedTiles.forEach(tile => {
         if (!tile.removed) {
           let tileDiv = document.createElement("div");
           tileDiv.className = "tile";
-          // If this tile is selected, add a highlight
+          // Add a selected CSS class if the tile is selected.
           if (tile.id === selectedTileId) {
             tileDiv.classList.add("selected");
           }
           tileDiv.textContent = tile.type;
-          // Position the tile
+          // Position the tile.
           tileDiv.style.left = tile.x + "px";
           tileDiv.style.top = tile.y + "px";
           tileDiv.style.zIndex = tile.z;
-          // Add click handler to process selection and matching
+          // Add click handler for selection and matching.
           tileDiv.onclick = () => handleTileClick(tile.id);
-          
           board.appendChild(tileDiv);
         }
       });
     }
     
-    /*********************************************
+    /***********************************************
      * Free Tile Detection
-     * A tile is free if:
-     * 1. No tile on a higher layer (z > current) overlaps it.
-     * 2. At least one of its left or right sides is not blocked by a tile on the same layer.
-     *********************************************/
+     * A tile is considered free if:
+     * 1. No tile on a higher layer (greater z) overlaps it.
+     * 2. At least one of its left or right sides is not blocked by another tile on the same layer.
+     ***********************************************/
     function isTileFree(tile) {
       if (tile.removed) return false;
       
-      // Condition 1: Check if any tile on a higher layer overlaps this tile.
+      // Check for overlap by any tile on a higher layer.
       for (let other of tiles) {
         if (!other.removed && other.z > tile.z) {
           if (isOverlap(tile, other)) {
@@ -319,7 +328,7 @@
         }
       }
       
-      // Condition 2: Check for horizontal free sides on same layer.
+      // Check horizontal free sides on the same layer.
       let leftBlocked = false;
       let rightBlocked = false;
       for (let other of tiles) {
@@ -328,11 +337,10 @@
           if (isTouchingRight(tile, other)) rightBlocked = true;
         }
       }
-      // Tile is free if at least one side is available.
       return (!leftBlocked || !rightBlocked);
     }
     
-    // Check if two tiles overlap (bounding box intersection)
+    // Returns true if two tiles overlap (bounding box check)
     function isOverlap(tile1, tile2) {
       return (tile1.x < tile2.x + tile2.width &&
               tile1.x + tile1.width > tile2.x &&
@@ -340,7 +348,7 @@
               tile1.y + tile1.height > tile2.y);
     }
     
-    // Check if another tile touches the left side of the current tile.
+    // Check if a tile touches the left side of another tile.
     function isTouchingLeft(tile, other) {
       if (other.x + other.width >= tile.x - 10 && other.x + other.width <= tile.x + 10) {
         return verticalOverlap(tile, other);
@@ -348,7 +356,7 @@
       return false;
     }
     
-    // Check if another tile touches the right side of the current tile.
+    // Check if a tile touches the right side of another tile.
     function isTouchingRight(tile, other) {
       if (other.x <= tile.x + tile.width + 10 && other.x >= tile.x + tile.width - 10) {
         return verticalOverlap(tile, other);
@@ -356,20 +364,19 @@
       return false;
     }
     
+    // Check if the vertical spans of two tiles overlap.
     function verticalOverlap(tile, other) {
       return (tile.y < other.y + other.height && tile.y + tile.height > other.y);
     }
     
-    /*********************************************
+    /***********************************************
      * Tile Selection & Matching
-     * Click on a free tile to select it. When a second free tile is clicked,
-     * if they match (same type) they are removed. If not, selection is cleared.
-     *********************************************/
+     ***********************************************/
     function handleTileClick(tileId) {
       let tile = tiles.find(t => t.id === tileId);
       if (!tile || tile.removed) return;
       
-      // Check if the tile is free.
+      // Only allow selection if the tile is free.
       if (!isTileFree(tile)) {
         document.getElementById("message").textContent = "Tile is not free.";
         return;
@@ -381,11 +388,11 @@
         document.getElementById("message").textContent = "Selected tile " + tile.type + ". Select a matching free tile.";
         renderTiles();
       }
-      // If a tile is already selected, check for a match.
+      // If a tile was already selected, check for a match.
       else {
         let firstTile = tiles.find(t => t.id === selectedTileId);
-        // If clicking the same tile, deselect.
         if (firstTile.id === tile.id) {
+          // User clicked the same tile – deselect.
           selectedTileId = null;
           document.getElementById("message").textContent = "";
           renderTiles();
@@ -400,7 +407,7 @@
           renderTiles();
           checkWinCondition();
         } else {
-          // Mismatched selection; clear selection and show feedback.
+          // Mismatch: clear selection.
           document.getElementById("message").textContent = "Tiles do not match. Try again.";
           selectedTileId = null;
           renderTiles();
@@ -408,9 +415,9 @@
       }
     }
     
-    /*********************************************
+    /***********************************************
      * Win Condition
-     *********************************************/
+     ***********************************************/
     function checkWinCondition() {
       let remaining = tiles.filter(t => !t.removed).length;
       if (remaining === 0) {
@@ -418,9 +425,9 @@
       }
     }
     
-    /*********************************************
-     * Event Listeners for UI Buttons and Help Modal
-     *********************************************/
+    /***********************************************
+     * Event Handlers for UI Buttons and Help Modal
+     ***********************************************/
     document.getElementById("newGameBtn").onclick = function() {
       initGame();
     };
@@ -436,9 +443,9 @@
       }
     };
     
-    /*********************************************
+    /***********************************************
      * Initialize the Game
-     *********************************************/
+     ***********************************************/
     initGame();
   </script>
 </body>
