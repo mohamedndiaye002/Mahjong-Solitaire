@@ -7,7 +7,7 @@
 
 ## Overview
 
-**Mahjong Solitaire – is a modern, fully responsive single‑player web game that faithfully adapts classic Mahjong Solitaire for the web. The game uses Mahjong tile emoji (styled in a nearly black color with decorative card frames) and dynamically generates levels. With each level clearance, extra tiles and an additional layer are added to raise the challenge. The rules follow the traditional gameplay where only free tiles can be selected and matched, and players remove pairs until the board is cleared.
+Mahjong Solitaire – is a modern, fully responsive single‑player web game that faithfully adapts classic Mahjong Solitaire for the web. The game uses Mahjong tile emoji (styled in a nearly black color with decorative card frames) and dynamically generates levels. With each level clearance, extra tiles and an additional layer are added to raise the challenge. The rules follow the traditional gameplay where only free tiles can be selected and matched, and players remove pairs until the board is cleared.
 
 ## Features
 
